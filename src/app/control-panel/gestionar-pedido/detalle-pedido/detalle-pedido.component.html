@@ -175,6 +175,11 @@
           </button>
         </div>
         <div class="col-6" style="text-align: left;">
+          <button class="button" (click)="generarCotizacion()" [disabled]="loading">
+          Generar cotización
+          </button>
+        </div>
+        <div class="col-6" style="text-align: left;">
           <button type="button" class="btn btn-outline-dark" [routerLink]="['/home/gestionar-pedido']">Atrás</button>
         </div>
       </div>

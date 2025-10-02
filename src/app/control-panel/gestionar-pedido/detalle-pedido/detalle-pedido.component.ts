@@ -7,12 +7,17 @@ import { MatSort } from '@angular/material/sort';
 import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ActivatedRoute, Router } from '@angular/router';
+import { QuotesService } from 'src/app/quote/quotes.service';
+
+
 
 @Component({
   selector: 'app-detalle-pedido',
   templateUrl: './detalle-pedido.component.html',
   styleUrls: ['./detalle-pedido.component.css']
 })
+
+
 export class DetallePedidoComponent implements OnInit, AfterViewInit {
   // ====== Columnas (solo lectura) ======
   columnsToDisplay = ['Nro', 'Fecha', 'Hora', 'Direccion', 'DireccionExacta', 'Notas']; // sin Editar/Quitar
@@ -26,6 +31,7 @@ export class DetallePedidoComponent implements OnInit, AfterViewInit {
   evento: any[] = [];
   servicioSeleccionado = 1;
   eventoSeleccionado = 1;
+  loading = false;
 
   dataSource: MatTableDataSource<any> = new MatTableDataSource<any>([]);
   dataSource1: MatTableDataSource<any> = new MatTableDataSource<any>([]);
@@ -70,10 +76,13 @@ export class DetallePedidoComponent implements OnInit, AfterViewInit {
     public visualizarService: VisualizarService,
     private route: ActivatedRoute,
     private router: Router,
-  ) { }
+    private quotes: QuotesService
 
+  ) { }
+  logoBase64?: string;
   // ====== Ciclo de vida ======
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
+    await this.loadLogo();
     this.pedidoId = +(this.route.snapshot.paramMap.get('id') || 0);
     if (!this.pedidoId) {
       swal.fire({
@@ -223,4 +232,156 @@ export class DetallePedidoComponent implements OnInit, AfterViewInit {
   get totalSeleccion(): number {
     return this.selectedPaquetes.reduce((sum, p) => sum + (+p.precio || 0), 0);
   }
+
+  // ====== agrega este método al final de la clase ======
+  // ====== reemplaza TODO tu método por este ======
+generarCotizacion() {
+  this.loading = true;
+
+  // 1) Datos base ya visibles en la pantalla
+  const ev = this.ubicacion?.[0] || null;
+  const nombrePedido = this.visualizarService?.selectAgregarPedido?.NombrePedido || '';
+  const observaciones = this.visualizarService?.selectAgregarPedido?.Observacion || '';
+
+  // Fecha formateada como "YYYY-MM-DD (dom)"
+  const fechaISO = ev?.Fecha || '';
+  const fechaConDia = fechaISO ? `${fechaISO} (${this.weekdayPeru(fechaISO)})` : '-';
+
+  // 2) Items mapeados desde tu tabla (cantidad = 1)
+  const itemsMapped = (this.selectedPaquetes || []).map(x => ({
+    descripcion: x.descripcion || '-',
+    precio: Number(x.precio || 0),
+    cantidad: 1
+  }));
+
+  // 3) Totales por tipo (heurística simple por palabras clave)
+  const isFoto = (d: string) => /foto|fotografía|phot/i.test(d || '');
+  const isVideo = (d: string) => /video|vídeo/i.test(d || '');
+
+  let totalFoto = 0, totalVideo = 0;
+  for (const it of itemsMapped) {
+    if (isVideo(it.descripcion)) totalVideo += it.precio * (it.cantidad || 1);
+    else totalFoto += it.precio * (it.cantidad || 1); // por defecto cae en Foto
+  }
+
+  // 4) Payload con el formato de la plantilla
+  const payload = {
+    // ----- Cabecera -----
+    company: {
+      name: "D’ La Cruz Video y Fotografía",
+      logoBase64: this.logoBase64, // <--- agrega esto
+      footerText: 'Telf: 7481252 / 999 091 822 / 946 202 445    •    edwindelacruz03@gmail.com'
+    },
+    quoteNumber: `COT-${this.pedidoId || 'SN'}`,
+    createdAt: new Date(),
+
+    // ----- Datos base que ya tenías -----
+    pedido: {
+      nombre: nombrePedido || '-',
+      empleado: String(this.CodigoEmpleado || '—'),
+      fechaRegistro: this.visualizarService?.selectAgregarPedido?.fechaCreate || '-'
+    },
+    cliente: {
+      documento: this.infoCliente?.documento || '-',
+      nombres: this.infoCliente?.nombre || '-',
+      apellidos: this.infoCliente?.apellido || '-',
+      empresa: (this as any)?.infoCliente?.empresa || undefined
+    },
+    evento: {
+      numero: 1,
+      fecha: fechaConDia,
+      hora: ev?.Hora || '-',
+      direccionExacta: ev?.DireccionExacta || ev?.Direccion || '-',
+      notas: ev?.Notas || '-'
+    },
+    items: itemsMapped,
+    observaciones: observaciones || 'No hay observaciones',
+
+    // ----- Campos específicos para el layout de tu plantilla -----
+    destinatario:
+      (this as any)?.infoCliente?.empresa
+      || `${this.infoCliente?.nombre || ''} ${this.infoCliente?.apellido || ''}`.trim()
+      || '—',
+    atencion: `${this.infoCliente?.nombre || ''} ${this.infoCliente?.apellido || ''}`.trim() || '—',
+    eventoTitulo: `${nombrePedido || 'Evento'} – ${fechaConDia}`,
+
+    // Sección 1) Fotografía
+    seccionFoto: {
+      equipos: [
+        "2 cámaras fotográficas de 33 mega pixeles",
+        "Lente profesional: 24–105 mm • 1 flash TTL"
+      ],
+      personal: ["2 fotógrafos"],
+      locaciones: [
+        "Tomas fotográficas según el evento",
+        ev?.DireccionExacta || ev?.Direccion ? `Lugar: ${ev?.DireccionExacta || ev?.Direccion}` : null,
+        "Horario referencial: 8:00 a.m. a 6:30 p.m."
+      ].filter(Boolean),
+      productoFinal: [
+        "Carpeta online con fotos para su descarga – formato JPG de Alta Calidad"
+      ]
+    },
+
+    // Sección 2) Video
+    seccionVideo: {
+      equipos: [
+        "2 cámaras profesionales sistema 4K",
+        "Trípode Manfrotto, luz LED, lentes de alta definición"
+      ],
+      personal: ["2 videógrafos, 1 asistente"],
+      locaciones: ["Cobertura de las locaciones señaladas para el evento"],
+      productoFinal: [
+        "Carpeta online con video para su descarga – formato Full HD 1920 × 1080",
+        "Video resumen de 2 min, aprox",
+        "La edición NO incluye animación 2D y 3D"
+      ]
+    },
+
+    // Totales en USD (si trabajas en PEN, aquí podrías convertir)
+    totalesUSD: { foto: totalFoto, video: totalVideo },
+
+    // Pie
+    notaIGV: "Precios expresados en dólares no incluye el IGV (18%)",
+    despedida: "Sin otro en particular nos despedimos agradeciendo de antemano por la confianza recibida.",
+    fechaDoc: new Date().toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' }),
+    firmaNombre: "Edwin De La Cruz",
+    // firmaBase64: 'data:image/png;base64,...' // opcional
+  };
+
+  // 5) Llamada al backend y descarga del PDF
+  this.quotes.generar(payload).subscribe({
+    next: (blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${payload.quoteNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.loading = false;
+    },
+    error: () => {
+      this.loading = false;
+      swal.fire({
+        text: 'No se pudo generar la cotización.',
+        icon: 'error',
+        showCancelButton: false,
+        customClass: { confirmButton: 'btn btn-danger' },
+        buttonsStyling: false
+      });
+    }
+  });
+}
+private async loadLogo(): Promise<void> {
+  const resp = await fetch('assets/logo-dlacruz.jpg');
+  const blob = await resp.blob();
+  const reader = new FileReader();
+  await new Promise<void>((resolve, reject) => {
+    reader.onload = () => { this.logoBase64 = reader.result as string; resolve(); };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+
+
 }
