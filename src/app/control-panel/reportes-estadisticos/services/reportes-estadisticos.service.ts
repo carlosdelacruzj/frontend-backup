@@ -1,49 +1,53 @@
-import { Injectable, OnChanges } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import {
-  Equipos,
-  Evento,
-  Proyecto,
-  Estados,Ganancia,
-} from '../models/reportes-estadisticos.model';
+import { environment } from 'src/environments/environment';
+import { Observable, of } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 
-@Injectable({
-  providedIn: 'root',
-})
-export class ReportesEstadisticos {
+@Injectable({ providedIn: 'root' })
+export class ReportesEstadisticosService {
+  private readonly base = environment.apiUrl; // e.g. https://.../api
+
   constructor(private http: HttpClient) {}
 
-  private EQUIPOS =
-    'https://tp2021database.herokuapp.com/dashboard/consulta/getReporteListaEquipo';
+  private getWithFallback(pathNoV1: string, pathV1: string): Observable<any> {
+    const url1 = `${this.base}${pathNoV1}`;
+    const url2 = `${this.base}${pathV1}`;
 
-  private PROYECTOS =
-    'https://tp2021database.herokuapp.com/dashboard/consulta/getReporteProyectosXMes';
-
-  private SERVICIOS =
-    'https://tp2021database.herokuapp.com/dashboard/consulta/getReportEventosContado';
-
-  private ESTADOS_PROYECTOS =
-    'https://tp2021database.herokuapp.com/dashboard/consulta/getReporteEstadoProyectos';
-
-  private GANACIAS = 'https://tp2021database.herokuapp.com/dashboard/consulta/getReporteGanancias'
-
-  public getEquipos(): Observable<Equipos[]> {
-    return this.http.get<Equipos[]>(this.EQUIPOS);
-  }
-  public getProyectos(): Observable<Proyecto[]> {
-    return this.http.get<Proyecto[]>(this.PROYECTOS);
+    return this.http.get(url1).pipe(
+      catchError(err => {
+        if (err?.status === 404) {
+          // intenta la variante /v1
+          return this.http.get(url2);
+        }
+        throw err;
+      })
+    );
   }
 
-  public getEventos(): Observable<Evento[]> {
-    return this.http.get<Evento[]>(this.SERVICIOS);
+  getEquipos(): Observable<any> {
+    // /api/dashboard/...  -> fallback /api/v1/dashboard/...
+    return this.getWithFallback('/dashboard/reporte-lista-equipo',
+                                '/v1/dashboard/reporte-lista-equipo');
   }
 
-  public getEstados(): Observable<Estados> {
-    return this.http.get<Estados>(this.ESTADOS_PROYECTOS);
+  getProyectos(): Observable<any> {
+    return this.getWithFallback('/dashboard/reporte-proyectos-mes',
+                                '/v1/dashboard/reporte-proyectos-mes');
   }
 
-  public getGanancias(): Observable<Ganancia>{
-    return this.http.get<Ganancia>(this.GANACIAS)
+  getEventos(): Observable<any> {
+    return this.getWithFallback('/dashboard/reporte-eventos-contado',
+                                '/v1/dashboard/reporte-eventos-contado');
+  }
+
+  getEstados(): Observable<any> {
+    return this.getWithFallback('/dashboard/reporte-estado-proyectos',
+                                '/v1/dashboard/reporte-estado-proyectos');
+  }
+
+  getGanancias(): Observable<any> {
+    return this.getWithFallback('/dashboard/reporte-ganancias',
+                                '/v1/dashboard/reporte-ganancias');
   }
 }

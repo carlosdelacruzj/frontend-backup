@@ -158,7 +158,7 @@ export class AdministrarEquiposService {
     codigo: 0,
   };
 
-  private readonly base = `${environment.baseUrl}/equipo`;
+  private readonly base = `${environment.apiUrl}/equipo`;
   private EQUIPO_TIPOALL =
     'https://tp2021database.herokuapp.com/equipo/consulta/getAllTipoEquipo';
 

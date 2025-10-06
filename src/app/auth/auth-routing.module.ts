@@ -12,11 +12,12 @@ const routes: Routes = [
     path: '',
     component: MainComponent,
     children: [
+      { path: '', redirectTo: 'login', pathMatch: 'full' }, // 👈 redirección limpia
       { path: 'login', component: LoginComponent },
       { path: 'registro', component: RegistroComponent },
       { path: 'recuperar-contrasena', component: RecuperarContrasenaComponent },
       { path: 'nueva-contrasena', component: NuevaCContrasenaComponent },
-      { path: '**', redirectTo: 'login' },
+      { path: '**', redirectTo: 'login' } // fallback
     ]
   }
 ];
@@ -25,4 +26,4 @@ const routes: Routes = [
   imports: [RouterModule.forChild(routes)],
   exports: [RouterModule]
 })
-export class AuthRoutingModule { }
+export class AuthRoutingModule {}

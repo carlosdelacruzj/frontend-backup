@@ -25,7 +25,7 @@ export interface VoucherVM {
 
 @Injectable({ providedIn: 'root' })
 export class RegistrarPagoService {
-  private readonly API = environment.baseUrl;
+  private readonly API = environment.apiUrl;
 
   constructor(private http: HttpClient) { }
 

@@ -1,4 +1,4 @@
 export const environment = {
-   production: true,
-   baseUrl: 'https://tp2021database.herokuapp.com' // <-- o tu URL real de prod
+  production: true,
+  apiUrl: 'https://tesis-backend-node-632730481545.us-central1.run.app' // sin /api ni /v1
 };

@@ -21,7 +21,7 @@ export interface EmpleadoOption {
 
 @Injectable({ providedIn: 'root' })
 export class PersonalService {
-  private readonly base = `${environment.baseUrl}/empleados`;
+  private readonly base = `${environment.apiUrl}/empleados`;
 
   constructor(private http: HttpClient) {}
 

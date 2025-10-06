@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from 'src/app/auth/services/auth.service';
 
@@ -7,19 +7,20 @@ import { AuthService } from 'src/app/auth/services/auth.service';
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.css']
 })
-export class HeaderComponent implements OnInit {
+export class HeaderComponent {
 
-  get usuario(){
-    return this.authService.usuario;
-  }
-  
-  constructor(private router: Router, private authService: AuthService) { }
+  constructor(private router: Router, private authService: AuthService) {}
 
-  ngOnInit(): void {
+  get usuario() {
+    return this.authService.usuario; // puede ser null y el HTML ya lo maneja con ?
   }
-  logout(){
-    this.router.navigateByUrl('/auth');
+
+  logout() {
     this.authService.logout();
+    this.router.navigateByUrl('/auth/login');
   }
 
+  irLogin() {
+    this.router.navigateByUrl('/auth/login');
+  }
 }

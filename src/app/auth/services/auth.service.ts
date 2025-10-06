@@ -1,72 +1,141 @@
+// src/app/auth/services/auth.service.ts
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { environment } from 'src/environments/environment';
-import { catchError, map, tap } from "rxjs/operators";
-
+import { Observable, of, from } from 'rxjs';
+import { catchError, concatMap, map, tap, filter, take, defaultIfEmpty } from 'rxjs/operators';
 import { AuthResponse, Usuario } from '../interfaces/auth.interface';
-import { Observable, of } from 'rxjs';
-import Swal from 'sweetalert2'
- 
+import { ApiPrefixService } from 'src/app/shared/services/api-prefix.service';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class AuthService {
+  private domain = environment.apiUrl;        // sin /api ni /v1
+  private prefixes = ['', '/api', '/api/v1']; // orden de prueba
+  private _usuario: Usuario | null = null;
 
-  constructor(private http: HttpClient) { }
-  private baseUrl: string = environment.baseUrl;
-  private _usuario: Usuario;
+  get usuario(): Usuario | null { return this._usuario; }
 
-  get usuario() {
-    return { ...this._usuario };
+  constructor(
+    private http: HttpClient,
+    private apiPrefix: ApiPrefixService
+  ) {}
+
+  /** Intenta login moderno y, si 404, legacy. Repite contra varios prefijos hasta que alguno sirva. */
+  login(correo: string, pass: string): Observable<boolean> {
+    return from(this.prefixes).pipe(
+      concatMap(prefix => this.tryLoginWithPrefix(prefix, correo, pass)),
+      filter((v): v is boolean => typeof v === 'boolean'),
+      take(1),
+      defaultIfEmpty(false)
+    );
   }
 
-  login(correo: string, pass: string) {
-    const url = `${this.baseUrl}/usuario/consulta/getIniciarSesion/${correo}/${pass}`
-    return this.http.get<AuthResponse>(url)
-      .pipe(
-        tap(resp => {
-          if (resp[0].token) {
-            localStorage.setItem('token', resp[0].token);
-            // localStorage.setItem('codigo',resp)
-            localStorage.setItem('correo', correo);
-            this._usuario = {
-              nombre: resp[0].nombre,
-              apellido: resp[0].apellido,
-              ID: resp[0].apellido,
-              documento: resp[0].documento,
-              rol: resp[0].rol,
-              token: resp[0].token
-            }
-          }
-        }),
-        map(resp => resp[0].token),
-        catchError(err => of(false))
-      );
+  private tryLoginWithPrefix(prefix: string, correo: string, pass: string): Observable<boolean | 'next'> {
+    const modernUrl = `${this.domain}${prefix}/auth/login`;
+
+    return this.http.post<AuthResponse>(modernUrl, { correo, pass }).pipe(
+      tap(() => {
+        console.log(`[auth] OK (modern): ${modernUrl}`);
+        this.apiPrefix.setGoodPrefix(prefix); // ✅ guarda prefijo exitoso
+      }),
+      tap((resp) => this.persistUserFromModern(resp, correo)),
+      map((resp) => !!resp?.token),
+      catchError((err: HttpErrorResponse) => {
+        if (err?.status === 404) {
+          const legacyUrl = `${this.domain}${prefix}/usuario/consulta/getIniciarSesion/${correo}/${pass}`;
+          return this.http.get<any>(legacyUrl).pipe(
+            tap(() => {
+              console.log(`[auth] OK (legacy): ${legacyUrl}`);
+              this.apiPrefix.setGoodPrefix(prefix);
+            }),
+            map((resp) => Array.isArray(resp) ? resp[0] : resp),
+            tap((r) => this.persistUserFromLegacy(r, correo)),
+            map((r) => !!r?.token),
+            catchError((legacyErr: HttpErrorResponse) => {
+              if (legacyErr?.status === 404) {
+                console.warn(`[auth] 404 en ${modernUrl} y ${legacyUrl}. Probando siguiente prefijo…`);
+                return of<'next'>('next');
+              }
+              console.error('[auth] login error (legacy)', legacyErr);
+              this._usuario = null;
+              return of(false);
+            })
+          );
+        }
+        console.error('[auth] login error (modern)', err);
+        this._usuario = null;
+        return of(false);
+      })
+    );
   }
-  validacion(correo: string, codigo: number) {
-    const url = `${this.baseUrl}/usuario/consulta/getValidacionCodex/${correo}/${codigo}`
-    return this.http.get(url)
-      .pipe(
-        map(resp => resp[0])
-      );
-  }
-  verificaAuteticacion(): Observable<boolean> {
-    if (!localStorage.getItem('token')) {
-      return of(false);
+
+  /** ---------- helpers de mapeo/estado ---------- */
+  private persistUserFromModern(resp: AuthResponse | null | undefined, correo: string): void {
+    if (resp?.token) {
+      localStorage.setItem('token', resp.token);
+      localStorage.setItem('correo', correo);
+      this._usuario = {
+        nombre: resp.nombre,
+        apellido: resp.apellido,
+        ID: resp.ID,
+        documento: resp.documento,
+        rol: resp.rol,
+        token: resp.token,
+      };
+    } else {
+      this._usuario = null;
     }
-    return this.http.get<AuthResponse>(`${this.baseUrl}/usuario/consulta/getIniciarSesion/${localStorage.getItem('correo')}/${localStorage.getItem('pass')}`)
-      .pipe(
-        map(resp => {
-          resp = resp[0];
-          return true;
-        })
-      )
   }
-  logout(){
- 
+
+  private persistUserFromLegacy(r: any, correo: string): void {
+    if (r?.token) {
+      localStorage.setItem('token', r.token);
+      localStorage.setItem('correo', correo);
+      this._usuario = {
+        nombre: r.nombre,
+        apellido: r.apellido,
+        ID: r.ID,
+        documento: r.documento,
+        rol: r.rol,
+        token: r.token,
+      };
+    } else {
+      this._usuario = null;
+    }
+  }
+
+  /** Valida código (reintentando por prefijos). */
+  validacion(correo: string, codigo: number): Observable<boolean> {
+    return from(this.prefixes).pipe(
+      concatMap(prefix => this.tryValidacionWithPrefix(prefix, correo, codigo)),
+      filter((v): v is boolean => typeof v === 'boolean'),
+      take(1),
+      defaultIfEmpty(false)
+    );
+  }
+
+  private tryValidacionWithPrefix(prefix: string, correo: string, codigo: number): Observable<boolean | 'next'> {
+    const url = `${this.domain}${prefix}/usuario/consulta/getValidacionCodex/${correo}/${codigo}`;
+    return this.http.get<any>(url).pipe(
+      tap(() => console.log(`[auth] validacion OK: ${url}`)),
+      map((resp) => Array.isArray(resp) ? resp[0] : resp),
+      map((r) => r?.validacion === 1 || r?.validacion === true),
+      catchError((err: HttpErrorResponse) => {
+        if (err?.status === 404) return of<'next'>('next');
+        console.error('[auth] validacion error', err);
+        return of(false);
+      })
+    );
+  }
+
+  /** Verifica si hay sesión activa */
+  verificaAuteticacion(): Observable<boolean> {
+    const token = localStorage.getItem('token');
+    return of(!!token);
+  }
+
+  logout(): void {
     localStorage.clear();
-
+    this._usuario = null;
   }
-
 }

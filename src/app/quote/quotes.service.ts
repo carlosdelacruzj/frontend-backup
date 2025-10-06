@@ -1,16 +1,16 @@
-import { HttpClient } from '@angular/common/http';
+// src/app/quote/quotes.service.ts
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from 'src/environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class QuotesService {
-  private baseUrl = 'http://localhost:3000/api'; // ← apunta directo al backend
-  //private baseUrl = '/api'; // gracias al proxy apunta al backend en :3000
+  private baseUrl = environment.apiUrl; // ✅ usa apiUrl
 
   constructor(private http: HttpClient) {}
 
   generar(payload: any) {
-    return this.http.post(`${this.baseUrl}/cotizaciones`, payload, {
-      responseType: 'blob' // <- recibes PDF
-    });
+    // Asegúrate que el backend tenga esta ruta /api/cotizaciones
+    return this.http.post(`${this.baseUrl}/cotizaciones`, payload, { responseType: 'blob' });
   }
 }

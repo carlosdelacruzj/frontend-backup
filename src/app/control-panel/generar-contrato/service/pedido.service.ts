@@ -2,10 +2,9 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Pedido, Pedido2 } from '../model/pedido.model';
+import { environment } from 'src/environments/environment';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable({ providedIn: 'root' })
 export class PedidoService {
   selectPedido: Pedido = {
     ID: 0,
@@ -17,6 +16,7 @@ export class PedidoService {
     Estado: '',
     EstadoPago: ''
   };
+
   selectPedido2: Pedido2 = {
     Empleado: '',
     N_Pedido: 0,
@@ -33,21 +33,32 @@ export class PedidoService {
     Direccion: '',
     Descripcion: '',
     NombrePedido: '',
-    correo:''
+    correo: ''
   };
-  
 
   pedido: Pedido[] = [];
   pedido2: Pedido2[] = [];
-  private API_PRUEBA =
-    'https://tp2021database.herokuapp.com/contrato/consulta/getAllContratos';
+
+  // 👇 Base unificada
+  private readonly API = environment.apiUrl; // e.g. https://tesis-backend-node.onrender.com/api/v1
+
   constructor(private http: HttpClient) {}
 
-  public getAllNombres(): Observable<any> {
-    return this.http.get('https://tp2021database.herokuapp.com/contrato/consulta/getAllContratos');
+  // === ENDPOINTS REALS A TU API ===
+  getAllNombres(): Observable<any> {
+    return this.http.get(`${this.API}/pedido`);
   }
 
-  public getAllNombresID(id: any): Observable<any> {
-    return this.http.get('https://tp2021database.herokuapp.com/pedido/consulta/getByIDPedido/'+ id);
+  getAllNombresID(id: any): Observable<any> {
+    return this.http.get(`${this.API}/pedido/${id}`);
+  }
+
+  // 👇 Estas dos eran las que te estaban llamando al 4200
+  getServicios(): Observable<any> {
+    return this.http.get(`${this.API}/servicios`);
+  }
+
+  getEventos(): Observable<any> {
+    return this.http.get(`${this.API}/eventos`);
   }
 }

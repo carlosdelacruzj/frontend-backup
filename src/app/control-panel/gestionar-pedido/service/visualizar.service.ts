@@ -31,7 +31,7 @@ export class VisualizarService {
   // =========================
   // Endpoints (estandarizados)
   // =========================
-  private readonly API_BASE = environment.baseUrl;                 // e.g. https://tp2021database.herokuapp.com
+  private readonly API_BASE = environment.apiUrl;                 // e.g. https://tp2021database.herokuapp.com
   private readonly API_PEDIDO = `${this.API_BASE}/pedido`;         // /pedido
   private readonly API_EVENTOS_SERV = `${this.API_BASE}/eventos_servicios`; // /eventos_servicios
 

@@ -28,7 +28,7 @@ export class ClienteService {
     ECli_Nombre: ''
   };
 
-  private API_PRUEBA = `${environment.baseUrl}/clientes`;
+  private API_PRUEBA = `${environment.apiUrl}/clientes`;
 
   constructor(private http: HttpClient) {}
 
